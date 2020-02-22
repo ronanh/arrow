@@ -19,6 +19,7 @@ package array
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 	"unsafe"
 
@@ -135,7 +136,7 @@ func (b *StringBuilder) Cap() int { return b.builder.Cap() }
 func (b *StringBuilder) NullN() int { return b.builder.NullN() }
 
 func (b *StringBuilder) Append(v string) {
-	b.builder.Append([]byte(v))
+	b.builder.Append(unsafeStrToBytes(v))
 }
 
 func (b *StringBuilder) AppendNull() {
@@ -146,6 +147,13 @@ func (b *StringBuilder) AppendNull() {
 // in v are valid (not null). The valid slice must either be empty or be equal in length to v. If empty,
 // all values in v are appended and considered valid.
 func (b *StringBuilder) AppendValues(v []string, valid []bool) {
+	var dataLen int
+	for _, s := range v {
+		dataLen += len(s)
+	}
+	if dataLen > 0 {
+		b.builder.ReserveData(dataLen)
+	}
 	b.builder.AppendStringValues(v, valid)
 }
 
@@ -167,6 +175,12 @@ func (b *StringBuilder) Reserve(n int) {
 	b.builder.Reserve(n)
 }
 
+// ReserveData ensures there is enough space for appending n bytes
+// by checking the capacity and resizing the data buffer if necessary.
+func (b *StringBuilder) ReserveData(n int) {
+	b.builder.ReserveData(n)
+}
+
 // Resize adjusts the space allocated by b to n elements. If n is greater than b.Cap(),
 // additional memory will be allocated. If n is smaller, the allocated memory may reduced.
 func (b *StringBuilder) Resize(n int) {
@@ -186,6 +200,19 @@ func (b *StringBuilder) NewStringArray() (a *String) {
 	a = NewStringData(data)
 	data.Release()
 	return
+}
+
+// unsafeStrToBytes builds a byte slice that shares the underlying string Data array.
+// Compared to casting string to []byte, this avoids any data copy and string alloc on heap.
+// the returned array should not be mutated (segfault)
+func unsafeStrToBytes(s string) []byte {
+	header := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	bytesHeader := &reflect.SliceHeader{
+		Data: header.Data,
+		Len:  header.Len,
+		Cap:  header.Len,
+	}
+	return *(*[]byte)(unsafe.Pointer(bytesHeader))
 }
 
 var (
