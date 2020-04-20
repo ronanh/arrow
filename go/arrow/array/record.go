@@ -246,6 +246,7 @@ func (rec *simpleRecord) NewSlice(i, j int64) Record {
 func (rec *simpleRecord) String() string {
 	o := new(strings.Builder)
 	fmt.Fprintf(o, "record:\n  %v\n", rec.schema)
+	fmt.Fprintf(o, "  refs: %d\n", rec.refCount)
 	fmt.Fprintf(o, "  rows: %d\n", rec.rows)
 	for i, col := range rec.arrs {
 		fmt.Fprintf(o, "  col[%d][%s]: %v\n", i, rec.schema.Field(i).Name, col)
