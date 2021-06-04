@@ -17,6 +17,7 @@
 package array_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/apache/arrow/go/arrow"
@@ -157,4 +158,47 @@ func TestStringBuilder_Empty(t *testing.T) {
 	a = ab.NewStringArray()
 	assert.Equal(t, want, stringValues(a))
 	a.Release()
+}
+func BenchmarkStringBuilder32(b *testing.B) {
+	benchmarkStringBuilder(b, 32, false)
+}
+func BenchmarkStringBuilder33(b *testing.B) {
+	benchmarkStringBuilder(b, 33, false)
+}
+
+func BenchmarkStringBuilder1000(b *testing.B) {
+	benchmarkStringBuilder(b, 1000, false)
+}
+
+func BenchmarkStringBuilder1000ReserveData(b *testing.B) {
+	benchmarkStringBuilder(b, 1000, true)
+}
+
+func benchmarkStringBuilder(b *testing.B, strLen int, reserveData bool) {
+	mem := memory.NewCheckedAllocator(memory.NewGoAllocator())
+	defer mem.AssertSize(b, 0)
+
+	const nbStrings = 1_000
+	str := strings.Repeat(".", strLen)
+	totalLen := nbStrings * strLen
+
+	for n := 0; n < b.N; n++ {
+		ab := array.NewStringBuilder(mem)
+		ab.Reserve(nbStrings)
+		if reserveData {
+			ab.ReserveData(totalLen)
+		}
+		for i := 0; i < nbStrings; i++ {
+			ab.Append(str)
+		}
+		a := ab.NewStringArray()
+		for i := 0; i < a.Len(); i++ {
+			s := a.Value(i)
+			if s != str {
+				b.Fatal("Unexpected string")
+			}
+		}
+		a.Release()
+		ab.Release()
+	}
 }
